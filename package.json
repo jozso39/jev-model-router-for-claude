@@ -1,14 +1,14 @@
 {
-  "name": "jev-openrouter",
+  "name": "jev-model-router-for-claude",
   "version": "0.3.0",
   "description": "Runs Claude Code and routes each turn to the cheapest sufficient model using TypeSafe Jev through an OpenRouter API key",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jozso39/jev-openrouter.git"
+    "url": "git+https://github.com/jozso39/jev-model-router-for-claude.git"
   },
-  "homepage": "https://github.com/jozso39/jev-openrouter#readme",
-  "bugs": "https://github.com/jozso39/jev-openrouter/issues",
+  "homepage": "https://github.com/jozso39/jev-model-router-for-claude#readme",
+  "bugs": "https://github.com/jozso39/jev-model-router-for-claude/issues",
   "bin": {
     "jev-claude": "bin/jev-claude.mjs",
     "jev-codex": "bin/jev-codex.mjs",

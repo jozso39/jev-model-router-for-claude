@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { decide, detectOverride } from "../src/policy.mjs";
+import { availableTiers } from "../src/config.mjs";
 import { QUESTIONS, shouldUseExactModel } from "../src/config.mjs";
 
 const ALL = ["haiku", "sonnet", "opus", "fable"];
@@ -87,4 +88,11 @@ test("never substitutes upward into paid fable", () => {
 test("accepts exact model changes within the same tier", () => {
   assert.equal(shouldUseExactModel("jev/no-change", "opus", "opus"), true);
   assert.equal(shouldUseExactModel("low-confidence-no-downgrade/no-change", "opus", "opus"), false);
+});
+
+test("fable is offered when the account catalog lists it, forced or blocked by JEV_ALLOW_FABLE", () => {
+  assert.deepEqual(availableTiers({ discovered: ["opus", "sonnet"], env: {} }), ["haiku", "sonnet", "opus"]);
+  assert.deepEqual(availableTiers({ discovered: ["opus", "fable"], env: {} }), ["haiku", "sonnet", "opus", "fable"]);
+  assert.deepEqual(availableTiers({ discovered: [], env: { JEV_ALLOW_FABLE: "1" } }), ["haiku", "sonnet", "opus", "fable"]);
+  assert.deepEqual(availableTiers({ discovered: ["fable"], env: { JEV_ALLOW_FABLE: "0" } }), ["haiku", "sonnet", "opus"]);
 });

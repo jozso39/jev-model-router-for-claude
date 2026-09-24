@@ -187,8 +187,11 @@ export async function startCodexProxy({
           }
           if (body.model === CODEX_AUTO_MODEL) {
             const key = codexConversationKey(body);
+            // Discovery comes from the raw catalog, never the configured fallback ids, so a
+            // long-tier model is only offered when the account can actually run one.
+            const discovered = [...new Set([...models.values()].map((model) => codexTierOf(model.slug)))];
             const candidates = codexModels(models).filter((model) =>
-              availableTiers().includes(model.tier),
+              availableTiers({ discovered }).includes(model.tier),
             );
             const available = [...new Set(candidates.map((model) => model.tier))];
             const currentModel = states.get(key)?.model ?? modelForTier(candidates, "opus");

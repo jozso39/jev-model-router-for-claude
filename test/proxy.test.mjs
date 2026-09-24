@@ -442,3 +442,40 @@ test("the proxy can be pinned to a port and refuses one that is taken", async (t
   t.after(pinned.close);
   assert.equal(pinned.port, first.port + 1);
 });
+
+test("fable is sent to Jev only once the account catalog lists it", async (t) => {
+  const offered = [];
+  const upstream = http.createServer((req, res) => {
+    req.on("data", () => {});
+    req.on("end", () => {
+      res.setHeader("content-type", "application/json");
+      if (req.url.startsWith("/v1/models")) {
+        return res.end(JSON.stringify({ data: [
+          { id: "claude-opus-5" }, { id: "claude-sonnet-5" }, { id: "claude-fable-5-1" },
+        ] }));
+      }
+      res.end('{"id":"msg_1","type":"message"}');
+    });
+  });
+  await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+  t.after(() => upstream.close());
+  const { port, close } = await startProxy({
+    upstreamURL: `http://127.0.0.1:${upstream.address().port}`,
+    route: async ({ models }) => {
+      offered.push(models.map((m) => m.tier));
+      return { choice: "claude-fable-5-1", confidence: 0.9, ms: 1 };
+    },
+  });
+  t.after(close);
+  const turn = (text) =>
+    fetch(`http://127.0.0.1:${port}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: "jev-router", tools: [{ name: "Bash" }], messages: [{ role: "user", content: text }] }),
+    });
+  await turn("before the catalog");           // static fallback: no fable
+  await fetch(`http://127.0.0.1:${port}/v1/models`);
+  await turn("after the catalog");
+  assert.equal(offered[0].includes("fable"), false);
+  assert.equal(offered[1].includes("fable"), true);
+});

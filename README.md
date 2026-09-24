@@ -1,6 +1,6 @@
-# jev-openrouter
+# jev-model-router-for-claude
 
-> **jev-openrouter** is a fork of [gargpratyush/jev-router](https://github.com/gargpratyush/jev-router)
+> **jev-model-router-for-claude** is a fork of [gargpratyush/jev-router](https://github.com/gargpratyush/jev-router)
 > that works with an **OpenRouter API key alone**, no TypeSafe account needed (TypeSafe has
 > closed signups). It also follows the current Claude Code request shape (upstream stopped
 > routing on Claude Code 2.1.2xx) and adds `jev-proxy` for remote-control and IDE sessions.
@@ -27,8 +27,8 @@ The `jev-router` package on npm is the upstream project and does not include the
 backend; install this fork from git:
 
 ```bash
-git clone https://github.com/jozso39/jev-openrouter.git
-cd jev-openrouter
+git clone https://github.com/jozso39/jev-model-router-for-claude.git
+cd jev-model-router-for-claude
 npm install
 npm link
 echo "OPENROUTER_API_KEY=sk-or-..." > ~/.jev-router.env
@@ -230,7 +230,8 @@ One Jev call per fresh user turn selects a shared abstract tier:
 - low confidence never downgrades and caps upgrades at the balanced tier;
 - large conversations refuse downgrades that would waste more prompt-cache work than they save;
 - unavailable tiers step upward rather than silently choosing a weaker model;
-- the long tier is disabled unless `JEV_ALLOW_FABLE=1`.
+- the long tier (Fable) is offered whenever the signed-in account's model catalog lists it;
+  `JEV_ALLOW_FABLE=0` keeps it off, `JEV_ALLOW_FABLE=1` forces it on.
 
 Tool-loop continuations keep the tier chosen at the start of the turn. Main conversations and
 sub-agents are pinned separately. Routing is fail-open: Jev failure never blocks the CLI.
@@ -242,7 +243,7 @@ sub-agents are pinned separately. Routing is fail-open: Jev failure never blocks
 | `JEV_API_KEY` | Both | Enables routing through TypeSafe. `TYPESAFE_API_KEY` also works. |
 | `OPENROUTER_API_KEY` | Both | Enables routing through OpenRouter (see [Jev via OpenRouter](#jev-via-openrouter)). |
 | `JEV_PROVIDER` / `JEV_MODEL` / `JEV_BASE_URL` | Both | Backend selection and overrides (see [Jev via OpenRouter](#jev-via-openrouter)). |
-| `JEV_ALLOW_FABLE` | Both | Enables the opt-in long tier. |
+| `JEV_ALLOW_FABLE` | Both | `0` never offers Fable, `1` always does. Unset: offered when the account catalog lists it. |
 | `JEV_CONTEXT_1M` | Claude | Sends the 1M-context beta on routed Sonnet/Opus/Fable turns, matching Claude Code's `[1m]` variants. Behind the router Claude Code never adds it itself. |
 | `JEV_DEBUG` | Both | Logs decisions and rewrites to `~/.jev-claude.log` in interactive sessions. |
 | `JEV_DUMP` | Both | Dumps request bodies (and, for Claude, headers with credentials removed) for debugging wire-format changes. |
@@ -304,7 +305,7 @@ injection, and decision display.
 
 ## Contributing
 
-Issues and pull requests are welcome. Use [Issues](https://github.com/jozso39/jev-openrouter/issues)
+Issues and pull requests are welcome. Use [Issues](https://github.com/jozso39/jev-model-router-for-claude/issues)
 to report bugs, request improvements, or ask questions. Include the relevant Claude Code or
 Codex version, reproduction steps, expected behavior, and useful logs with secrets removed.
 

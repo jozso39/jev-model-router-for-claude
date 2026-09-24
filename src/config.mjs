@@ -40,11 +40,18 @@ export const tierOf = (model) =>
   TIERS.find((t) => typeof model === "string" && model.includes(t.family))?.name ?? null;
 
 /**
- * Fable bills extra usage credits, so it is opt-in. Everything else is covered by a normal
- * subscription.
+ * Tiers Jev may choose from. Fable is offered whenever the account's own model catalog lists
+ * it (`discovered`), never from the static fallback, so an account without Fable is not
+ * routed to a model it cannot run. `JEV_ALLOW_FABLE=1` forces it on regardless of discovery;
+ * `JEV_ALLOW_FABLE=0` keeps it off, for accounts where Fable bills extra usage credits.
  */
-export const availableTiers = () =>
-  TIER_NAMES.filter((n) => n !== "fable" || process.env.JEV_ALLOW_FABLE === "1");
+export const availableTiers = ({ discovered = [], env = process.env } = {}) =>
+  TIER_NAMES.filter((n) => {
+    if (n !== "fable") return true;
+    if (env.JEV_ALLOW_FABLE === "1") return true;
+    if (env.JEV_ALLOW_FABLE === "0") return false;
+    return discovered.includes("fable");
+  });
 
 export const THRESHOLDS = {
   /** Below this Jev confidence we refuse to downgrade and cap upgrades at `uncertainCeiling`. */

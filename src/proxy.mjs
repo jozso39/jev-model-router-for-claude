@@ -260,8 +260,9 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
             const explaining = prompt?.includes("<jev-explain>");
             let fresh = null;
             if (prompt && !explaining) {
+              const discovered = [...new Set([...catalog.keys()].map(tierOf))];
               const models = claudeModels([...catalog.values()]).filter((model) =>
-                availableTiers().includes(model.tier),
+                availableTiers({ discovered }).includes(model.tier),
               );
               const available = [...new Set(models.map((model) => model.tier))];
               const currentModel = state.model ?? modelForTier(models, current);
@@ -354,6 +355,7 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
                 for (const model of JSON.parse(data.toString()).data ?? []) {
                   if (tierOf(model?.id)) catalog.set(model.id, model);
                 }
+                debug(`catalog: ${[...catalog.keys()].join(", ") || "no Claude models"}`);
               } catch (err) {
                 debug(`could not read Claude model catalog: ${err.message}`);
               }
