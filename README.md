@@ -189,7 +189,9 @@ JEV_PROXY_PORT=4517 jev-proxy      # prints the ANTHROPIC_* variables to set
 ```
 
 Routing policy, logging (`JEV_DEBUG`, `JEV_DUMP`) and credentials are identical to
-`jev-claude`. Without `JEV_PROXY_PORT` a free port is chosen and printed. The proxy does not
+`jev-claude`. For the Claude desktop app on macOS, see
+[docs/desktop-app-macos.md](docs/desktop-app-macos.md): a launchd agent for the proxy plus an
+`env` block in `~/.claude/settings.json`. Without `JEV_PROXY_PORT` a free port is chosen and printed. The proxy does not
 inject a status line; read decisions from its log or with `jev-explain`.
 
 ## How it works
