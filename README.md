@@ -31,7 +31,7 @@ git clone https://github.com/jozso39/jev-openrouter.git
 cd jev-openrouter
 npm install
 npm link
-echo "JEV_API_KEY=..." > ~/.jev-router.env
+echo "OPENROUTER_API_KEY=sk-or-..." > ~/.jev-router.env
 ```
 
 On Windows PowerShell:
@@ -40,14 +40,8 @@ On Windows PowerShell:
 Set-Content "$HOME\.jev-router.env" "OPENROUTER_API_KEY=sk-or-..."
 ```
 
-Get a key from [TypeSafe](https://docs.typesafe.ai), or use an existing
-[OpenRouter](https://openrouter.ai) key instead (see [Jev via OpenRouter](#jev-via-openrouter)):
-
-```bash
-echo "OPENROUTER_API_KEY=sk-or-..." > ~/.jev-router.env
-```
-
-Then launch either interface from any repository:
+Any [OpenRouter](https://openrouter.ai) key works (see [Jev via OpenRouter](#jev-via-openrouter));
+a TypeSafe key in `JEV_API_KEY` is also accepted. Then launch either interface from any repository:
 
 ```bash
 jev-claude
