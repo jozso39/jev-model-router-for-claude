@@ -1,14 +1,14 @@
 {
   "name": "jev-router",
   "version": "0.3.0",
-  "description": "Runs coding CLIs and routes each turn to the cheapest sufficient model using TypeSafe Jev",
+  "description": "Runs coding CLIs and routes each turn to the cheapest sufficient model using TypeSafe Jev, via OpenRouter or TypeSafe",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gargpratyush/jev-router.git"
+    "url": "git+https://github.com/jozso39/jev-router.git"
   },
-  "homepage": "https://github.com/gargpratyush/jev-router#readme",
-  "bugs": "https://github.com/gargpratyush/jev-router/issues",
+  "homepage": "https://github.com/jozso39/jev-router#readme",
+  "bugs": "https://github.com/jozso39/jev-router/issues",
   "bin": {
     "jev-claude": "bin/jev-claude.mjs",
     "jev-codex": "bin/jev-codex.mjs",
