@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODEX_AUTO_MODEL, startCodexProxy } from "./codex-proxy.mjs";
 import { hasJevKey, NO_KEY_HINT } from "./backend.mjs";
+import { loadEnvFiles, PRIMARY_ENV_FILE } from "./env-files.mjs";
 
 const PROVIDER = "jev";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -18,17 +19,7 @@ export function installCodexSkill(home = homedir()) {
 }
 
 export function loadEnv() {
-  for (const file of [
-    join(process.cwd(), ".env"),
-    join(homedir(), ".jev-router.env"),
-    join(homedir(), ".jev-claude.env"),
-  ]) {
-    try {
-      process.loadEnvFile(file);
-    } catch {
-      // Missing or unreadable; values may still come from the real environment.
-    }
-  }
+  loadEnvFiles();
 }
 
 export function resolveCodex() {
@@ -101,7 +92,7 @@ export async function runCodex() {
   } else {
     process.stderr.write(
       "[jev] no Jev credential found - starting Codex without routing\n" +
-        `[jev] add ${NO_KEY_HINT} to ${join(homedir(), ".jev-router.env")} and restart jev-codex\n`,
+        `[jev] add ${NO_KEY_HINT} to ${PRIMARY_ENV_FILE} and restart jev-codex\n`,
     );
   }
 

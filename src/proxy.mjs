@@ -204,11 +204,39 @@ export function observeModel(state, current) {
 }
 
 
+/** Request headers that identify the caller to Anthropic; copied onto the catalog probe. */
+const PROBE_HEADERS = ["authorization", "x-api-key", "anthropic-version", "anthropic-beta", "user-agent"];
+
+/**
+ * Fetches the account's model list from upstream with the credentials of the request in
+ * hand. Claude Code only fetches its catalog itself in some modes and versions, and without
+ * it the router cannot know whether the account has Fable, so the proxy asks once per
+ * process. Failure is logged and leaves the static fallback in place.
+ */
+export async function probeCatalog(upstreamURL, headers, catalog) {
+  const target = new URL(upstreamURL);
+  const picked = Object.fromEntries(PROBE_HEADERS.filter((h) => headers[h]).map((h) => [h, headers[h]]));
+  const res = await fetch(`${target.origin}${target.pathname.replace(/\/$/, "")}/v1/models?limit=100`, {
+    headers: { ...picked, accept: "application/json" },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  for (const model of (await res.json()).data ?? []) {
+    if (tierOf(model?.id)) catalog.set(model.id, model);
+  }
+  return catalog;
+}
+
 export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = askJev, port = 0 } = {}) {
   // Tier routed for each conversation's turn in flight, reused by its follow-up requests and
   // by the cache-rebuild guard, which needs to know what the prompt cache was built on.
   const convos = new Map();
   const catalog = new Map();
+  let probed = null;
+  const ensureCatalog = (headers) =>
+    (probed ??= probeCatalog(upstreamURL, headers, catalog)
+      .then(() => debug(`catalog (probed): ${[...catalog.keys()].join(", ") || "no Claude models"}`))
+      .catch((err) => debug(`catalog probe failed, using static model ids: ${err.message}`)));
   const stateFor = (key) => {
     let s = convos.get(key);
     if (!s) {
@@ -228,6 +256,7 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
       let out = Buffer.concat(chunks);
       let routedTier = null;
 
+      if (!/^\/v1\/messages/.test(req.url ?? "")) debug(`${req.method} ${req.url}`);
       if (/^\/v1\/messages/.test(req.url ?? "")) {
         try {
           const body = JSON.parse(out.toString());
@@ -260,6 +289,7 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
             const explaining = prompt?.includes("<jev-explain>");
             let fresh = null;
             if (prompt && !explaining) {
+              if (catalog.size === 0) await ensureCatalog(req.headers);
               const discovered = [...new Set([...catalog.keys()].map(tierOf))];
               const models = claudeModels([...catalog.values()]).filter((model) =>
                 availableTiers({ discovered }).includes(model.tier),

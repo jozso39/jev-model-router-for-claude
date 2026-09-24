@@ -9,6 +9,7 @@ import { AUTO_MODEL } from "../src/config.mjs";
 import { readSavedModel, restoreSavedModel } from "../src/settings.mjs";
 import { LOG_FILE } from "../src/log.mjs";
 import { hasJevKey, NO_KEY_HINT } from "../src/backend.mjs";
+import { loadEnvFiles, PRIMARY_ENV_FILE } from "../src/env-files.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
@@ -71,19 +72,7 @@ function statusLineArgs() {
   return ["--settings", file];
 }
 
-// Existing environment variables win, followed by project-local, shared user-level, then
-// the legacy Claude-specific file.
-for (const file of [
-  join(process.cwd(), ".env"),
-  join(homedir(), ".jev-router.env"),
-  join(homedir(), ".jev-claude.env"),
-]) {
-  try {
-    process.loadEnvFile(file);
-  } catch {
-    // Missing or unreadable; the key may still come from the real environment.
-  }
-}
+loadEnvFiles();
 
 /**
  * Finds the Claude Code executable on PATH. Resolving it here rather than leaning on the
@@ -139,7 +128,7 @@ if (hasJevKey()) {
 } else {
   process.stderr.write(
     `[jev] no Jev credential found - starting Claude Code without routing\n` +
-      `[jev] set ${NO_KEY_HINT} in ${join(homedir(), ".jev-router.env")} to enable routing\n`,
+      `[jev] set ${NO_KEY_HINT} in ${PRIMARY_ENV_FILE} to enable routing\n`,
   );
 }
 

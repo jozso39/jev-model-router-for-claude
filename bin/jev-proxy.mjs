@@ -8,21 +8,12 @@ import { join } from "node:path";
 import { startProxy } from "../src/proxy.mjs";
 import { AUTO_MODEL } from "../src/config.mjs";
 import { hasJevKey, NO_KEY_HINT, resolveBackend, describeBackend } from "../src/backend.mjs";
+import { loadEnvFiles, PRIMARY_ENV_FILE } from "../src/env-files.mjs";
 
-for (const file of [
-  join(process.cwd(), ".env"),
-  join(homedir(), ".jev-router.env"),
-  join(homedir(), ".jev-claude.env"),
-]) {
-  try {
-    process.loadEnvFile(file);
-  } catch {
-    // Missing or unreadable; the key may still come from the real environment.
-  }
-}
+loadEnvFiles();
 
 if (!hasJevKey()) {
-  process.stderr.write(`[jev] no Jev credential found; set ${NO_KEY_HINT} in ${join(homedir(), ".jev-router.env")}\n`);
+  process.stderr.write(`[jev] no Jev credential found; set ${NO_KEY_HINT} in ${PRIMARY_ENV_FILE}\n`);
   process.exit(1);
 }
 

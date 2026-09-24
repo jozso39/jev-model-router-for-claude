@@ -7,6 +7,7 @@ import {
   applyTier,
   applyContextBeta,
   CONTEXT_1M_BETA,
+  probeCatalog,
   claudeModels,
   conversationKey,
   sessionOf,
@@ -395,6 +396,7 @@ test("Claude Code auxiliary calls under the sentinel go to haiku, not the sessio
     const chunks = [];
     req.on("data", (chunk) => chunks.push(chunk));
     req.on("end", () => {
+      if (req.method === "GET") return res.end('{"data":[]}'); // the catalog probe
       seen.push(JSON.parse(Buffer.concat(chunks)));
       res.setHeader("content-type", "application/json");
       res.end('{"id":"msg_1","type":"message"}');
@@ -443,7 +445,7 @@ test("the proxy can be pinned to a port and refuses one that is taken", async (t
   assert.equal(pinned.port, first.port + 1);
 });
 
-test("fable is sent to Jev only once the account catalog lists it", async (t) => {
+test("fable is sent to Jev when the account catalog lists it", async (t) => {
   const offered = [];
   const upstream = http.createServer((req, res) => {
     req.on("data", () => {});
@@ -473,9 +475,73 @@ test("fable is sent to Jev only once the account catalog lists it", async (t) =>
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model: "jev-router", tools: [{ name: "Bash" }], messages: [{ role: "user", content: text }] }),
     });
-  await turn("before the catalog");           // static fallback: no fable
-  await fetch(`http://127.0.0.1:${port}/v1/models`);
-  await turn("after the catalog");
-  assert.equal(offered[0].includes("fable"), false);
+  await turn("first turn");   // the proxy probes the catalog itself before routing
+  await turn("second turn");
+  assert.equal(offered[0].includes("fable"), true);
   assert.equal(offered[1].includes("fable"), true);
+});
+
+test("without a catalog the static fallback never offers fable", async (t) => {
+  const offered = [];
+  const upstream = http.createServer((req, res) => {
+    req.on("data", () => {});
+    req.on("end", () => res.writeHead(req.method === "GET" ? 500 : 200).end("{}"));
+  });
+  await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+  t.after(() => upstream.close());
+  const { port, close } = await startProxy({
+    upstreamURL: `http://127.0.0.1:${upstream.address().port}`,
+    route: async ({ models }) => {
+      offered.push(models.map((m) => m.tier));
+      return null;
+    },
+  });
+  t.after(close);
+  await fetch(`http://127.0.0.1:${port}/v1/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model: "jev-router", tools: [{ name: "Bash" }], messages: [{ role: "user", content: "hi" }] }),
+  });
+  assert.deepEqual(offered[0], ["haiku", "sonnet", "opus"]);
+});
+
+test("the proxy probes the account catalog with the caller's own credentials", async (t) => {
+  const seenAuth = [];
+  const offered = [];
+  const upstream = http.createServer((req, res) => {
+    req.on("data", () => {});
+    req.on("end", () => {
+      res.setHeader("content-type", "application/json");
+      if (req.url.startsWith("/v1/models")) {
+        seenAuth.push(req.headers.authorization);
+        return res.end(JSON.stringify({ data: [{ id: "claude-opus-5" }, { id: "claude-fable-5-1" }] }));
+      }
+      res.end('{"id":"msg_1","type":"message"}');
+    });
+  });
+  await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+  t.after(() => upstream.close());
+  const { port, close } = await startProxy({
+    upstreamURL: `http://127.0.0.1:${upstream.address().port}`,
+    route: async ({ models }) => {
+      offered.push(models.map((m) => m.tier));
+      return { choice: "claude-fable-5-1", confidence: 0.9, ms: 1 };
+    },
+  });
+  t.after(close);
+  for (let i = 0; i < 2; i++) {
+    await fetch(`http://127.0.0.1:${port}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer oauth-token" },
+      body: JSON.stringify({ model: "jev-router", tools: [{ name: "Bash" }], messages: [{ role: "user", content: `turn ${i}` }] }),
+    });
+  }
+  assert.deepEqual(seenAuth, ["Bearer oauth-token"]); // probed once, with the caller's header
+  assert.equal(offered[0].includes("fable"), true);
+});
+
+test("a failed catalog probe leaves the static model ids in place", async () => {
+  const catalog = new Map();
+  await assert.rejects(probeCatalog("http://127.0.0.1:1", {}, catalog));
+  assert.equal(catalog.size, 0);
 });

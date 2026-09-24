@@ -31,13 +31,13 @@ git clone https://github.com/jozso39/jev-model-router-for-claude.git
 cd jev-model-router-for-claude
 npm install
 npm link
-echo "OPENROUTER_API_KEY=sk-or-..." > ~/.jev-router.env
+mkdir -p ~/.claude && echo "OPENROUTER_API_KEY=sk-or-..." > ~/.claude/jev-router.env
 ```
 
 On Windows PowerShell:
 
 ```powershell
-Set-Content "$HOME\.jev-router.env" "OPENROUTER_API_KEY=sk-or-..."
+Set-Content "$HOME\.claude\jev-router.env" "OPENROUTER_API_KEY=sk-or-..."
 ```
 
 Any [OpenRouter](https://openrouter.ai) key works (see [Jev via OpenRouter](#jev-via-openrouter));
@@ -254,7 +254,7 @@ sub-agents are pinned separately. Routing is fail-open: Jev failure never blocks
 | `JEV_CODEX_LONG_MODEL` | Codex | Long model; defaults to `gpt-6-astra`. |
 
 Existing environment variables have highest precedence, followed by `.env` in the launch
-directory, `~/.jev-router.env`, and the legacy `~/.jev-claude.env`.
+directory, `~/.claude/jev-router.env`, then the older `~/.jev-router.env` and `~/.jev-claude.env`.
 
 Tier definitions, Jev's question, confidence thresholds, and timeouts live in `src/config.mjs`.
 Both launchers send Jev the exact models in the signed-in account's native catalog, so model
