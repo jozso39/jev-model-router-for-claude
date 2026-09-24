@@ -1,10 +1,10 @@
-# jev-router
+# jev-openrouter
 
-> Fork of [gargpratyush/jev-router](https://github.com/gargpratyush/jev-router) that works with
-> an **OpenRouter API key alone**, no TypeSafe account needed (TypeSafe has closed signups).
-> It also follows the current Claude Code request shape (upstream stopped routing on Claude
-> Code 2.1.2xx), adds `jev-proxy` for remote-control and IDE sessions, and ships a matching
-> extension for [oh-my-pi](omp/README.md). See [Jev via OpenRouter](#jev-via-openrouter).
+> **jev-openrouter** is a fork of [gargpratyush/jev-router](https://github.com/gargpratyush/jev-router)
+> that works with an **OpenRouter API key alone**, no TypeSafe account needed (TypeSafe has
+> closed signups). It also follows the current Claude Code request shape (upstream stopped
+> routing on Claude Code 2.1.2xx) and adds `jev-proxy` for remote-control and IDE sessions.
+> See [Jev via OpenRouter](#jev-via-openrouter).
 
 Automatic per-turn model routing for Claude Code and OpenAI Codex. Jev sends simple work to
 the fast tier and difficult work to the strong tier, while preserving each CLI's native
@@ -33,8 +33,8 @@ echo "JEV_API_KEY=..." > ~/.jev-router.env
 ### 2. Local repository
 
 ```bash
-git clone https://github.com/jozso39/jev-router.git
-cd jev-router
+git clone https://github.com/jozso39/jev-openrouter.git
+cd jev-openrouter
 npm install
 npm link
 echo "JEV_API_KEY=..." > ~/.jev-router.env
@@ -316,7 +316,7 @@ injection, and decision display.
 
 ## Contributing
 
-Issues and pull requests are welcome. Use [Issues](https://github.com/jozso39/jev-router/issues)
+Issues and pull requests are welcome. Use [Issues](https://github.com/jozso39/jev-openrouter/issues)
 to report bugs, request improvements, or ask questions. Include the relevant Claude Code or
 Codex version, reproduction steps, expected behavior, and useful logs with secrets removed.
 
