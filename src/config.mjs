@@ -6,13 +6,14 @@ import { choice, score } from "@typesafe-ai/sdk";
  * substring used to recognise whatever model Claude Code asked for, which may be an older
  * version within the same tier such as `claude-sonnet-4-6`. The capability flags come from
  * the Agent SDK's model catalogue: Haiku supports neither adaptive thinking nor effort, so
- * those fields have to be stripped when routing down to it.
+ * those fields have to be stripped when routing down to it. `context1m` marks tiers that
+ * accept the 1M-context beta (see `applyContextBeta` in proxy.mjs).
  */
 export const TIERS = [
-  { name: "haiku", id: "claude-haiku-4-5-20251001", family: "haiku", thinking: false, effort: false },
-  { name: "sonnet", id: "claude-sonnet-5", family: "sonnet", thinking: true, effort: true },
-  { name: "opus", id: "claude-opus-5", family: "opus", thinking: true, effort: true },
-  { name: "fable", id: "claude-fable-5-1", family: "fable", thinking: true, effort: true },
+  { name: "haiku", id: "claude-haiku-4-5-20251001", family: "haiku", thinking: false, effort: false, context1m: false },
+  { name: "sonnet", id: "claude-sonnet-5", family: "sonnet", thinking: true, effort: true, context1m: true },
+  { name: "opus", id: "claude-opus-5", family: "opus", thinking: true, effort: true, context1m: true },
+  { name: "fable", id: "claude-fable-5-1", family: "fable", thinking: true, effort: true, context1m: true },
 ];
 
 export const TIER_NAMES = TIERS.map((t) => t.name);

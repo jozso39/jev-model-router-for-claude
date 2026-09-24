@@ -7,6 +7,7 @@ import {
   THRESHOLDS,
 } from "./config.mjs";
 import { log } from "./log.mjs";
+import { describeBackend, resolveBackend } from "./backend.mjs";
 
 // The SDK's defaults (10s per attempt, 2 retries, no total budget) are far too slow for a
 // per-prompt hot path, so the timeout, retry count and an outer deadline are all pinned.
@@ -14,8 +15,14 @@ import { log } from "./log.mjs";
 // should degrade to "no routing", not stop the session from starting.
 let client;
 function getClient() {
-  client ??= new TypeSafeClient({
-    apiKey: process.env.JEV_API_KEY ?? process.env.TYPESAFE_API_KEY,
+  if (client) return client;
+  const backend = resolveBackend();
+  if (!backend) throw new Error("no Jev credential in the environment");
+  log(`jev backend: ${describeBackend(backend)}`);
+  client = new TypeSafeClient({
+    apiKey: backend.apiKey,
+    baseURL: backend.baseURL,
+    defaultModel: backend.model,
     timeout: THRESHOLDS.jevTimeoutMs,
     retry: { maxRetries: THRESHOLDS.jevMaxRetries, backoffInitialMs: 150, backoffMaxMs: 400 },
     logLevel: "warn", // never "debug": request bodies contain the user's prompt

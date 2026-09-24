@@ -5,6 +5,8 @@ import {
   sanitizeSchema,
   newTurnPrompt,
   applyTier,
+  applyContextBeta,
+  CONTEXT_1M_BETA,
   claudeModels,
   conversationKey,
   sessionOf,
@@ -240,6 +242,24 @@ test("ignores a request whose last message is from the assistant", () => {
   assert.equal(newTurnPrompt(body), null);
 });
 
+test("reads the user turn behind Claude Code's trailing environment message", () => {
+  const body = withTools([
+    { role: "user", content: [{ type: "text", text: "fix the bug" }] },
+    { role: "system", content: [{ type: "text", text: "# Environment\nPrimary working directory: /tmp" }] },
+  ]);
+  assert.equal(newTurnPrompt(body), "fix the bug");
+});
+
+test("a trailing environment message does not turn a tool continuation into a new turn", () => {
+  const body = withTools([
+    { role: "user", content: "fix the bug" },
+    { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] },
+    { role: "system", content: [{ type: "text", text: "# Environment" }] },
+  ]);
+  assert.equal(newTurnPrompt(body), null);
+});
+
 test("ignores an empty prompt", () => {
   assert.equal(newTurnPrompt(withTools([{ role: "user", content: "   " }])), null);
 });
@@ -354,4 +374,62 @@ test("the same opening text in two sessions gets two keys", () => {
 test("the key survives metadata that is not JSON", () => {
   const body = { metadata: { user_id: "not-json" }, messages: [{ role: "user", content: "hi" }] };
   assert.doesNotThrow(() => conversationKey(body));
+});
+
+test("the 1M-context beta is opt-in and only for tiers that have a 1M window", () => {
+  const off = applyContextBeta({ "anthropic-beta": "a" }, "opus", {});
+  assert.equal(off["anthropic-beta"], "a");
+  const opus = applyContextBeta({ "anthropic-beta": "a, b" }, "opus", { JEV_CONTEXT_1M: "1" });
+  assert.equal(opus["anthropic-beta"], `a,b,${CONTEXT_1M_BETA}`);
+  const bare = applyContextBeta({}, "sonnet", { JEV_CONTEXT_1M: "1" });
+  assert.equal(bare["anthropic-beta"], CONTEXT_1M_BETA);
+  const haiku = applyContextBeta({ "anthropic-beta": "a" }, "haiku", { JEV_CONTEXT_1M: "1" });
+  assert.equal(haiku["anthropic-beta"], "a");
+  const already = applyContextBeta({ "anthropic-beta": CONTEXT_1M_BETA }, "opus", { JEV_CONTEXT_1M: "1" });
+  assert.equal(already["anthropic-beta"], CONTEXT_1M_BETA);
+});
+
+test("Claude Code auxiliary calls under the sentinel go to haiku, not the session tier", async (t) => {
+  const seen = [];
+  const upstream = http.createServer((req, res) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      seen.push(JSON.parse(Buffer.concat(chunks)));
+      res.setHeader("content-type", "application/json");
+      res.end('{"id":"msg_1","type":"message"}');
+    });
+  });
+  await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+  t.after(() => upstream.close());
+
+  const { port, close } = await startProxy({
+    upstreamURL: `http://127.0.0.1:${upstream.address().port}`,
+    route: async () => ({ choice: "claude-opus-5", confidence: 0.95, ms: 1 }),
+  });
+  t.after(close);
+
+  const post = (body) =>
+    fetch(`http://127.0.0.1:${port}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  // A real turn, routed to opus and pinned for the conversation.
+  await post({
+    model: "jev-router",
+    tools: [{ name: "Bash" }],
+    thinking: { type: "adaptive" },
+    messages: [{ role: "user", content: "debug this race" }],
+  });
+  // The tool-less state summary Claude Code fires for the same session.
+  await post({
+    model: "jev-router",
+    thinking: { type: "adaptive" },
+    messages: [{ role: "user", content: "Current state: working (for 0m)" }],
+  });
+
+  assert.equal(seen[0].model, "claude-opus-5");
+  assert.equal(seen[1].model, "claude-haiku-4-5-20251001");
+  assert.equal(seen[1].thinking, undefined);
 });

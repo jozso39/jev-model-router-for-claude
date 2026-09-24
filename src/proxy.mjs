@@ -17,6 +17,8 @@ import { log } from "./log.mjs";
 import { writeDecision, writeStatus } from "./status.mjs";
 
 const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+/** Tier for Claude Code's tool-less auxiliary calls, which never need reasoning. */
+export const AUXILIARY_TIER = "haiku";
 const debug = (line) => process.env.JEV_DEBUG && log(line);
 
 /**
@@ -54,7 +56,7 @@ export function sanitizeSchema(node) {
  */
 export function newTurnPrompt(body) {
   if (!Array.isArray(body?.tools) || body.tools.length === 0) return null; // auxiliary call
-  const last = body?.messages?.[body.messages.length - 1];
+  const last = lastConversationMessage(body?.messages);
   if (!last || last.role !== "user") return null;
   let text;
   if (typeof last.content === "string") {
@@ -69,6 +71,41 @@ export function newTurnPrompt(body) {
     return null;
   }
   return text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim() || null;
+}
+
+/**
+ * The message that ends the conversation proper. Recent Claude Code versions append an
+ * environment block (working directory, platform, date) as a trailing message that is not
+ * part of the exchange; treating it as "the last message" would hide every user turn from
+ * the router and pin the session to the default tier.
+ */
+function lastConversationMessage(messages) {
+  if (!Array.isArray(messages)) return null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "user" || messages[i]?.role === "assistant") return messages[i];
+  }
+  return null;
+}
+
+/**
+ * The beta Claude Code sends for its `[1m]` model variants. Behind the router the model
+ * Claude Code selected is the sentinel, so it never composes this itself; a user who runs
+ * Opus with the 1M window would otherwise silently drop to 200k on every routed turn.
+ */
+export const CONTEXT_1M_BETA = "context-1m-2025-08-07";
+
+/**
+ * Adds the 1M-context beta to a routed request's headers when `JEV_CONTEXT_1M=1` and the
+ * tier supports it. Haiku has no 1M window, and the beta is left alone when already present.
+ */
+export function applyContextBeta(headers, tierName, env = process.env) {
+  if (env.JEV_CONTEXT_1M !== "1") return headers;
+  if (!tierSpec(tierName)?.context1m) return headers;
+  const current = headers["anthropic-beta"];
+  const betas = typeof current === "string" && current.trim() ? current.split(",").map((b) => b.trim()) : [];
+  if (!betas.includes(CONTEXT_1M_BETA)) betas.push(CONTEXT_1M_BETA);
+  headers["anthropic-beta"] = betas.join(",");
+  return headers;
 }
 
 /**
@@ -189,13 +226,18 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
     req.on("data", (c) => chunks.push(c));
     req.on("end", async () => {
       let out = Buffer.concat(chunks);
+      let routedTier = null;
 
       if (/^\/v1\/messages/.test(req.url ?? "")) {
         try {
           const body = JSON.parse(out.toString());
           // Claude Code's request shape is undocumented and moves; JEV_DUMP captures it.
+          // Headers go to a sibling file with credentials removed, since betas live there.
           if (process.env.JEV_DUMP) {
-            writeFileSync(`${process.env.JEV_DUMP}.${Date.now()}.json`, JSON.stringify(body, null, 2));
+            const stamp = `${process.env.JEV_DUMP}.${Date.now()}`;
+            writeFileSync(`${stamp}.json`, JSON.stringify(body, null, 2));
+            const { authorization, "x-api-key": _key, cookie, ...safe } = req.headers;
+            writeFileSync(`${stamp}.headers.json`, JSON.stringify(safe, null, 2));
           }
           body.tools?.forEach((t) => sanitizeSchema(t.input_schema));
 
@@ -256,11 +298,16 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
               );
             }
             // The sentinel is not a real model, so every routed request must be rewritten,
-            // including follow-ups that reuse the tier chosen for the turn.
-            const tier = state.tier ?? current;
-            const model = state.model ?? idOf(tier);
+            // including follow-ups that reuse the tier chosen for the turn. Claude Code's own
+            // auxiliary calls (state summaries, titles) carry no tools; recent versions send
+            // them under the session model rather than their old fixed Haiku id, and they
+            // must not ride the session's tier up to Opus.
+            const auxiliary = !Array.isArray(body.tools) || body.tools.length === 0;
+            const tier = auxiliary ? AUXILIARY_TIER : (state.tier ?? current);
+            const model = auxiliary ? modelForTier(claudeModels([...catalog.values()]), tier) : (state.model ?? idOf(tier));
             debug(`${key} rewrite ${body.model} -> ${model}`);
             applyTier(body, tier, model);
+            routedTier = tier;
             // Publish what went out. Claude Code's UI shows the row you picked, not the tier
             // it resolved to, so the status line is the only place this is visible.
             // `claude -p` omits metadata on the first request of a session, so there is no
@@ -281,6 +328,7 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
       const transport = target.protocol === "http:" ? http : https;
       const headers = { ...req.headers, host: target.host };
       delete headers["content-length"];
+      if (routedTier) applyContextBeta(headers, routedTier);
       if (req.method === "GET" && /^\/v1\/models(?:\?|$)/.test(req.url ?? "")) {
         delete headers["accept-encoding"];
       }

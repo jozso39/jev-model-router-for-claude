@@ -40,8 +40,14 @@ On Windows PowerShell:
 Set-Content "$HOME\.jev-router.env" "JEV_API_KEY=..."
 ```
 
-Get a key from [TypeSafe](https://docs.typesafe.ai). Then launch either interface from any
-repository:
+Get a key from [TypeSafe](https://docs.typesafe.ai), or use an existing
+[OpenRouter](https://openrouter.ai) key instead (see [Jev via OpenRouter](#jev-via-openrouter)):
+
+```bash
+echo "OPENROUTER_API_KEY=sk-or-..." > ~/.jev-router.env
+```
+
+Then launch either interface from any repository:
 
 ```bash
 jev-claude
@@ -157,6 +163,27 @@ Codex's footer shows `jev-router` because it displays the selected picker entry,
 not the model chosen behind that provider. If Jev is unavailable, the commentary names the
 fallback model and explains how to set `JEV_API_KEY`.
 
+## Jev via OpenRouter
+
+OpenRouter serves Jev as [`typesafe/jev-1.13`](https://openrouter.ai/typesafe/jev-1.13) through
+the same System One wire format that TypeSafe does, billed to the OpenRouter account at
+Jev's list price ($0.042 per million input tokens, output free). A routing decision is
+roughly 1k input tokens, so a turn costs about $0.00004 and adds ~0.5 s.
+
+With only `OPENROUTER_API_KEY` set, `jev-claude` and `jev-codex` route through OpenRouter.
+No TypeSafe account is needed. If both an OpenRouter key and a TypeSafe key are present,
+TypeSafe is used unless `JEV_PROVIDER=openrouter` is set, because OpenRouter keys are often
+in the environment for other tools.
+
+| Variable | Effect |
+| --- | --- |
+| `OPENROUTER_API_KEY` | Enables routing through OpenRouter when no TypeSafe key is set. |
+| `JEV_PROVIDER` | `openrouter` or `typesafe`; forces the backend when both keys are present. |
+| `JEV_MODEL` | Jev model id. Defaults to `typesafe/jev-1.13` on OpenRouter and `jev-latest` on TypeSafe; `~typesafe/jev-latest` tracks OpenRouter's newest release. |
+| `JEV_BASE_URL` | API root override for either backend, for a gateway in front of it. |
+
+`JEV_DEBUG=1` logs which backend was selected on the first routed turn, without the key.
+
 ## How it works
 
 Each command starts a loopback proxy, launches the real CLI, and forwards the CLI's existing
@@ -204,10 +231,13 @@ sub-agents are pinned separately. Routing is fail-open: Jev failure never blocks
 
 | Variable | Interface | Effect |
 | --- | --- | --- |
-| `JEV_API_KEY` | Both | Enables routing. `TYPESAFE_API_KEY` also works. |
+| `JEV_API_KEY` | Both | Enables routing through TypeSafe. `TYPESAFE_API_KEY` also works. |
+| `OPENROUTER_API_KEY` | Both | Enables routing through OpenRouter (see [Jev via OpenRouter](#jev-via-openrouter)). |
+| `JEV_PROVIDER` / `JEV_MODEL` / `JEV_BASE_URL` | Both | Backend selection and overrides (see [Jev via OpenRouter](#jev-via-openrouter)). |
 | `JEV_ALLOW_FABLE` | Both | Enables the opt-in long tier. |
+| `JEV_CONTEXT_1M` | Claude | Sends the 1M-context beta on routed Sonnet/Opus/Fable turns, matching Claude Code's `[1m]` variants. Behind the router Claude Code never adds it itself. |
 | `JEV_DEBUG` | Both | Logs decisions and rewrites to `~/.jev-claude.log` in interactive sessions. |
-| `JEV_DUMP` | Both | Dumps request bodies for debugging wire-format changes. |
+| `JEV_DUMP` | Both | Dumps request bodies (and, for Claude, headers with credentials removed) for debugging wire-format changes. |
 | `JEV_NO_STATUSLINE` | Claude | Disables the injected Claude status line. |
 | `JEV_CODEX_FAST_MODEL` | Codex | Fast model; defaults to `gpt-5.6-luna`. |
 | `JEV_CODEX_BALANCED_MODEL` | Codex | Balanced model; defaults to `gpt-5.6-terra`. |
@@ -224,6 +254,9 @@ ids are used only until the CLI fetches its catalog.
 
 ## Compatibility notes
 
+- Claude Code 2.1.2xx appends an environment block as a trailing `system`-role message after
+  the user's prompt. The router looks past it to find the user turn; older versions of this
+  project saw no user turn at all and left every session on the default tier.
 - Claude Code needs schema normalisation for older MCP JSON Schema fields when a custom base
   URL is active.
 - Claude request fields unsupported by a routed tier, such as adaptive thinking on Haiku,
@@ -238,7 +271,7 @@ ids are used only until the CLI fetches its catalog.
 
 ```bash
 npm install
-echo "JEV_API_KEY=..." > .env
+echo "JEV_API_KEY=..." > .env   # or OPENROUTER_API_KEY=...
 
 npm test
 node test/live-routing.mjs
@@ -252,11 +285,14 @@ injection, and decision display.
 
 ## Limitations
 
-- The user's prompt text is sent to TypeSafe for the routing decision. Nothing else is.
+- The user's prompt text is sent to TypeSafe, or to OpenRouter when routing through it, for
+  the routing decision. Nothing else is.
 - Jev adds latency only to the first request of a turn; tool-loop continuations add none.
 - Claude Code and Codex request formats are not public contracts. Use `JEV_DUMP` to diagnose
   upstream changes.
 - Developed and tested on Windows against Claude Code v2.1.101 and OpenAI Codex v0.154.0.
+  The OpenRouter backend and the trailing-environment-message fix were tested on Linux
+  (arm64) against Claude Code v2.1.277.
 
 ## Contributing
 
