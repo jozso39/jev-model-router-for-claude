@@ -204,7 +204,7 @@ export function observeModel(state, current) {
 }
 
 
-export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = askJev } = {}) {
+export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = askJev, port = 0 } = {}) {
   // Tier routed for each conversation's turn in flight, reused by its follow-up requests and
   // by the cache-rebuild guard, which needs to know what the prompt cache was built on.
   const convos = new Map();
@@ -391,6 +391,9 @@ export async function startProxy({ upstreamURL = ANTHROPIC_BASE_URL, route = ask
     });
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", resolve);
+  });
   return { port: server.address().port, close: () => server.close() };
 }

@@ -184,6 +184,20 @@ in the environment for other tools.
 
 `JEV_DEBUG=1` logs which backend was selected on the first routed turn, without the key.
 
+## Standalone proxy (`jev-proxy`)
+
+`jev-claude` wraps a `claude` process it starts itself. For Claude Code processes started by
+something else — a `claude remote-control` service, an IDE extension, a supervisor — run the
+proxy on its own and hand those processes its environment:
+
+```bash
+JEV_PROXY_PORT=4517 jev-proxy      # prints the ANTHROPIC_* variables to set
+```
+
+Routing policy, logging (`JEV_DEBUG`, `JEV_DUMP`) and credentials are identical to
+`jev-claude`. Without `JEV_PROXY_PORT` a free port is chosen and printed. The proxy does not
+inject a status line; read decisions from its log or with `jev-explain`.
+
 ## How it works
 
 Each command starts a loopback proxy, launches the real CLI, and forwards the CLI's existing

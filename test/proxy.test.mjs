@@ -433,3 +433,12 @@ test("Claude Code auxiliary calls under the sentinel go to haiku, not the sessio
   assert.equal(seen[1].model, "claude-haiku-4-5-20251001");
   assert.equal(seen[1].thinking, undefined);
 });
+
+test("the proxy can be pinned to a port and refuses one that is taken", async (t) => {
+  const first = await startProxy({ port: 0, route: async () => null });
+  t.after(first.close);
+  await assert.rejects(startProxy({ port: first.port, route: async () => null }), /EADDRINUSE/);
+  const pinned = await startProxy({ port: first.port + 1, route: async () => null });
+  t.after(pinned.close);
+  assert.equal(pinned.port, first.port + 1);
+});
