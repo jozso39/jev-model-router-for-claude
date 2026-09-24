@@ -23,14 +23,8 @@ Requires Node.js 20.12+ and at least one supported CLI:
 [Claude Code](https://code.claude.com/docs/en/setup) or
 [OpenAI Codex](https://developers.openai.com/codex/cli).
 
-### 1. npm package
-
-```bash
-npm install -g jev-router
-echo "JEV_API_KEY=..." > ~/.jev-router.env
-```
-
-### 2. Local repository
+The `jev-router` package on npm is the upstream project and does not include the OpenRouter
+backend; install this fork from git:
 
 ```bash
 git clone https://github.com/jozso39/jev-openrouter.git
@@ -43,7 +37,7 @@ echo "JEV_API_KEY=..." > ~/.jev-router.env
 On Windows PowerShell:
 
 ```powershell
-Set-Content "$HOME\.jev-router.env" "JEV_API_KEY=..."
+Set-Content "$HOME\.jev-router.env" "OPENROUTER_API_KEY=sk-or-..."
 ```
 
 Get a key from [TypeSafe](https://docs.typesafe.ai), or use an existing
